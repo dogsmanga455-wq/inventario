@@ -3,6 +3,7 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const productoRoutes = require('./routes/productos');
@@ -23,6 +24,10 @@ app.use('/ventas', ventaRoutes);
 app.use('/reportes', reporteRoutes);
 app.use('/empleados', empleadosRoutes);
 
+app.get('/', (req, res) => {
+  res.send('✅ Backend del sistema de inventario funcionando correctamente');
+});
+
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
