@@ -1,0 +1,42 @@
+# 🔹 Dependencias
+node_modules/
+
+# 🔹 Archivos de entorno y configuraciones sensibles
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# 🔹 Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 🔹 Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# 🔹 Compilaciones o builds
+dist/
+build/
+coverage/
+
+# 🔹 Archivos temporales
+*.tmp
+*.swp
+*.swo
+*.bak
+
+# 🔹 Configuración del editor
+.vscode/
+.idea/
+
+# 🔹 Railway (si usas CLI y genera archivos locales)
+.railway/
+
+# 🔹 Archivos de prueba o ejemplos
+testConnection.js
+tests/
