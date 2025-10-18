@@ -1,8 +1,10 @@
 const db = require('../db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv');
+dotenv.config();
 
-const SECRET = 'mi_secreto_123'; // cambiar por variable de entorno en producción
+const SECRET = process.env.JWT_SECRET; // cambiar por variable de entorno en producción
 // 🔐 Función para validar contraseña
 const validarContrasena = (password) => {
   // Al menos 8 caracteres, al menos 1 mayúscula y 1 minúscula
