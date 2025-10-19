@@ -48,10 +48,12 @@ exports.update = async (req, res) => {
 
 exports.delete = async (req, res) => {
   const { id } = req.params;
+  console.log('🟡 Intentando eliminar producto con id:', id);
   try {
     await db.query('DELETE FROM productos WHERE id = ?', [id]);
     res.json({ message: 'Producto eliminado' });
   } catch (err) {
+    console.error('❌ Error en delete:', err.message);
     res.status(500).json({ error: err.message });
   }
 };
