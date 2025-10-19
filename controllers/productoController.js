@@ -54,7 +54,7 @@ exports.delete = async (req, res) => {
     res.json({ message: 'Producto eliminado' });
   } catch (err) {
   if (err.code === 'ER_ROW_IS_REFERENCED_2') {
-    return res.status(400).json({ error: 'No se puede eliminar: el producto está asociado a ventas.' });
+    return res.status(400).json({ error: 'No se puede eliminar: porque el producto ya vendio una unidad.' });
   }
   res.status(500).json({ error: err.message });
 }
