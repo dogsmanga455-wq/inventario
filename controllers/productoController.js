@@ -53,7 +53,9 @@ exports.delete = async (req, res) => {
     await db.query('DELETE FROM productos WHERE id = ?', [id]);
     res.json({ message: 'Producto eliminado' });
   } catch (err) {
-    console.error('❌ Error en delete:', err.message);
-    res.status(500).json({ error: err.message });
+  if (err.code === 'ER_ROW_IS_REFERENCED_2') {
+    return res.status(400).json({ error: 'No se puede eliminar: el producto está asociado a ventas.' });
   }
+  res.status(500).json({ error: err.message });
+}
 };
