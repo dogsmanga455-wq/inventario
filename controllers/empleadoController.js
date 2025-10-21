@@ -7,7 +7,9 @@ const validarContrasena = (password) => /^(?=.*[a-z])(?=.*[A-Z]).{8,}$/.test(pas
 exports.getAll = async (req, res) => {
   try {
     if (req.user.rol !== 'admin') return res.status(403).json({ error: 'Acceso denegado' });
-    const [rows] = await db.query("SELECT id, nombre, usuario, rol FROM usuarios WHERE rol != 'admin'");
+
+    // 🔹 Incluimos el campo correo
+    const [rows] = await db.query("SELECT id, nombre, usuario, correo, rol FROM usuarios WHERE rol != 'admin'");
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -18,19 +20,25 @@ exports.getAll = async (req, res) => {
 exports.create = async (req, res) => {
   if (req.user.rol !== 'admin') return res.status(403).json({ error: 'Acceso denegado' });
 
-  const { nombre, usuario, contrasena, rol } = req.body;
+  // 🔹 Agregamos correo
+  const { nombre, usuario, contrasena, rol, correo } = req.body;
 
   if (!validarContrasena(contrasena)) {
     return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres, una mayúscula y una minúscula.' });
   }
 
+  if (!correo) {
+    return res.status(400).json({ error: 'El correo es obligatorio.' });
+  }
+
   try {
     const hashedPassword = await bcrypt.hash(contrasena, 10);
     const [result] = await db.query(
-      "INSERT INTO usuarios (nombre, usuario, contrasena, rol, intentos_fallidos, bloqueado_hasta) VALUES (?, ?, ?, ?, 0, NULL)",
-      [nombre, usuario, hashedPassword, rol || 'vendedor']
+      "INSERT INTO usuarios (nombre, usuario, contrasena, correo, rol, intentos_fallidos, bloqueado_hasta) VALUES (?, ?, ?, ?, ?, 0, NULL)",
+      [nombre, usuario, hashedPassword, correo, rol || 'vendedor']
     );
-    res.json({ id: result.insertId, nombre, usuario, rol });
+
+    res.json({ id: result.insertId, nombre, usuario, correo, rol });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al crear empleado' });
@@ -41,11 +49,12 @@ exports.update = async (req, res) => {
   if (req.user.rol !== 'admin') return res.status(403).json({ error: 'Acceso denegado' });
 
   const { id } = req.params;
-  const { nombre, usuario, contrasena, rol } = req.body;
+  // 🔹 Incluimos correo también
+  const { nombre, usuario, contrasena, rol, correo } = req.body;
 
   try {
-    let query = "UPDATE usuarios SET nombre = ?, usuario = ?, rol = ? WHERE id = ?";
-    let params = [nombre, usuario, rol, id];
+    let query = "UPDATE usuarios SET nombre = ?, usuario = ?, correo = ?, rol = ? WHERE id = ?";
+    let params = [nombre, usuario, correo, rol, id];
 
     // Si envían contraseña nueva, validarla y hashearla
     if (contrasena) {
@@ -53,12 +62,12 @@ exports.update = async (req, res) => {
         return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres, una mayúscula y una minúscula.' });
       }
       const hashedPassword = await bcrypt.hash(contrasena, 10);
-      query = "UPDATE usuarios SET nombre = ?, usuario = ?, rol = ?, contrasena = ? WHERE id = ?";
-      params = [nombre, usuario, rol, hashedPassword, id];
+      query = "UPDATE usuarios SET nombre = ?, usuario = ?, correo = ?, rol = ?, contrasena = ? WHERE id = ?";
+      params = [nombre, usuario, correo, rol, hashedPassword, id];
     }
 
     await db.query(query, params);
-    res.json({ id, nombre, usuario, rol });
+    res.json({ id, nombre, usuario, correo, rol });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al actualizar empleado' });

@@ -40,71 +40,115 @@ exports.register = async (req, res) => {
   }
 };
 
+const { sendVerificationCode } = require('../utils/email');
+
 exports.login = async (req, res) => {
   const { usuario, contrasena } = req.body;
-console.log("🟢 Datos recibidos del frontend:", req.body);
+  console.log("🟢 Datos recibidos del frontend:", req.body);
+
   try {
     const [rows] = await db.query('SELECT * FROM usuarios WHERE usuario = ?', [usuario]);
-     console.log("🟢 Resultado SQL:", rows);
+    console.log("🟢 Resultado SQL:", rows);
+
     if (rows.length === 0)
       return res.status(400).json({ error: 'Usuario o contraseña incorrectos' });
 
     const user = rows[0];
 
-    // 🧱 1. Verificar si está bloqueado (solo si bloqueado_hasta no es null)
+    // 🔒 1. Verificar bloqueo
     if (user.bloqueado_hasta && new Date(user.bloqueado_hasta) > new Date()) {
       const minutosRestantes = Math.ceil(
         (new Date(user.bloqueado_hasta) - new Date()) / 60000
       );
       return res.status(403).json({
-        error: `Cuenta bloqueada. Intenta de nuevo en ${minutosRestantes} minuto(s).`,
+        error: `Cuenta bloqueada. Intenta en ${minutosRestantes} minuto(s).`,
       });
     }
 
-    // 🔐 2. Comparar contraseñas
-    console.log("🟡 Contraseña recibida:", contrasena);
-    console.log("🟡 Hash en BD:", user.contrasena);
+    // 🔐 2. Verificar contraseña
     const match = await bcrypt.compare(contrasena, user.contrasena);
-    bcrypt.hash('admin123', 10).then(console.log);
     console.log("🧩 Resultado comparación:", match);
     if (!match) {
       const nuevosIntentos = (user.intentos_fallidos || 0) + 1;
 
       if (nuevosIntentos >= 3) {
-        const bloqueadoHasta = new Date(Date.now() + 5 * 60 * 1000); // 5 minutos
+        const bloqueadoHasta = new Date(Date.now() + 5 * 60 * 1000);
         await db.query(
           'UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = ? WHERE id = ?',
           [bloqueadoHasta, user.id]
         );
         return res.status(403).json({
-          error:
-            'Cuenta bloqueada por 5 minutos debido a múltiples intentos fallidos.',
+          error: 'Cuenta bloqueada 5 minutos por múltiples intentos fallidos.',
         });
       } else {
         await db.query(
           'UPDATE usuarios SET intentos_fallidos = ? WHERE id = ?',
           [nuevosIntentos, user.id]
         );
-        return res
-          .status(400)
-          .json({ error: 'Usuario o contraseña incorrectos.' });
+        return res.status(400).json({ error: 'Usuario o contraseña incorrectos.' });
       }
     }
 
-    // ✅ 3. Si la contraseña es correcta → limpiar intentos y desbloquear
+    // ✅ 3. Limpiar bloqueos e intentos
     await db.query(
       'UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = ?',
       [user.id]
     );
 
-    // 🪪 4. Crear token
+    // 📩 4. Generar y enviar código de verificación
+    const code = Math.floor(100000 + Math.random() * 900000); // 6 dígitos
+    await db.query(
+      'UPDATE usuarios SET codigo_verificacion = ?, codigo_expira = NOW() + INTERVAL 5 MINUTE WHERE id = ?',
+      [String(code), user.id]
+    );
+
+    await sendVerificationCode(user.correo, code);
+
+    console.log("📧 Código enviado a:", user.correo);
+
+    // 🔹 No generamos token todavía
+    res.json({
+      step: 'verify',
+      message: 'Código enviado al correo electrónico',
+      userId: user.id,
+    });
+
+  } catch (err) {
+    console.error('Error en login:', err);
+    res.status(500).json({ error: 'Error interno del servidor.' });
+  }
+};
+
+exports.verifyCode = async (req, res) => {
+  const { userId, code } = req.body;
+  const codeStr = String(code);
+  try {
+    const [rows] = await db.query(
+  'SELECT * FROM usuarios WHERE id = ? AND codigo_verificacion = ? AND codigo_expira > NOW()',
+  [userId, codeStr]
+);
+console.log("🟣 Verificando código", codeStr, "para usuario ID:", userId);
+
+    if (rows.length === 0) {
+      return res.status(400).json({ error: 'Código inválido o expirado' });
+    }
+
+    const user = rows[0];
+
+    // Limpia el código
+    await db.query(
+      'UPDATE usuarios SET codigo_verificacion = NULL, codigo_expira = NULL WHERE id = ?',
+      [userId]
+    );
+
+    // Genera token JWT
     const token = jwt.sign({ id: user.id, rol: user.rol }, SECRET, {
       expiresIn: '1h',
     });
 
-    res.json({ token, usuario: user.usuario, rol: user.rol });
-  } catch (err) {
-    console.error('Error en login:', err);
-    res.status(500).json({ error: 'Error interno del servidor.' });
+    res.json({ success: true, token, usuario: user.usuario, rol: user.rol });
+  } catch (error) {
+    console.error('Error en verificación:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
